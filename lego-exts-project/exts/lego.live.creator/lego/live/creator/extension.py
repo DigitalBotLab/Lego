@@ -1,12 +1,7 @@
 import omni.ext
 import omni.ui as ui
 
-
-# Functions and vars are available to other extension as usual in python: `example.python_ext.some_public_function(x)`
-def some_public_function(x: int):
-    print("[lego.live.creator] some_public_function was called with x: ", x)
-    return x ** x
-
+from .lego_info import LegoInfo
 
 # Any class derived from `omni.ext.IExt` in top level module (defined in `python.modules` of `extension.toml`) will be
 # instantiated when extension gets enabled and `on_startup(ext_id)` will be called. Later when extension gets disabled
@@ -17,27 +12,41 @@ class LegoLiveCreatorExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
         print("[lego.live.creator] lego live creator startup")
 
-        self._count = 0
-
-        self._window = ui.Window("My Window", width=300, height=300)
+        self._window = ui.Window("Lego Anim Creator", width=300, height=300)
         with self._window.frame:
             with ui.VStack():
-                label = ui.Label("")
+                self.lego_root_ui = ui.StringField(height=20, style={ "margin_height": 2})
+                self.lego_root_ui.model.set_value("/World/house")
+                ui.Button("Set Lego Anim", clicked_fn=self.set_lego_anim)
+                ui.Button("Debug", clicked_fn=self.debug)
 
+    def set_lego_anim(self):
+        print("set_lego_anim")
+        self.lego_info = LegoInfo(self.lego_root_ui.model.get_value_as_string())
+        print("add rigid bodies")
+        self.lego_info.add_rigid_body()        
+        self.lego_info.randomize_rigid_body_enable()
 
-                def on_click():
-                    self._count += 1
-                    label.text = f"count: {self._count}"
+        
 
-                def on_reset():
-                    self._count = 0
-                    label.text = "empty"
+    def debug(self):
+        print("debug")
+        import omni
+        curve_plugin = omni.anim.curve.acquire_interface()
 
-                on_reset()
+        from pxr import AnimationSchema, Usd
+        stage = omni.usd.get_context().get_stage()
+        prim_path = "/World/Cube"
+        prim = stage.GetPrimAtPath(prim_path)
 
-                with ui.HStack():
-                    ui.Button("Add", clicked_fn=on_click)
-                    ui.Button("Reset", clicked_fn=on_reset)
+        
+        (result, err) = omni.kit.commands.execute("SetAnimCurveKeys", 
+                                                  paths=["/World/Cube.physics:rigidBodyEnabled"], 
+                                                  value = False, time=Usd.TimeCode(10))
+
+        anim_data = AnimationSchema.AnimationData.Get(stage, "/World/Cube/animationData")
+        print("anim_data", bool(anim_data))
 
     def on_shutdown(self):
         print("[lego.live.creator] lego live creator shutdown")
+
